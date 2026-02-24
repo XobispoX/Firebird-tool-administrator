@@ -4,9 +4,23 @@
  */
 package UI;
 
+import db.ConnectionProfile;
+import db.ConnectionManager;
+import db.FirebirdConnector;
+import UI.LoginFrame;
+import UI.newConnectionFrame;
+import db.MetadataService;
+
 import java.sql.Connection;
+import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Vector;
+import javax.swing.table.DefaultTableModel;
 /**
  *
  * @author danie
@@ -14,25 +28,99 @@ import javax.swing.tree.DefaultTreeModel;
 public class MainFrame extends javax.swing.JFrame {
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(MainFrame.class.getName());
-    private Connection connection;
-    public MainFrame(Connection conn) {
+    
+    private ConnectionManager connectionManager;
+    public MainFrame(ConnectionManager manager) {
         initComponents();
-        this.connection = conn;
+        this.connectionManager = manager;
         loadTree();
+        treeDatabase.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                if (evt.getClickCount() == 2) { // double-click
+                    DefaultMutableTreeNode node = (DefaultMutableTreeNode) treeDatabase.getLastSelectedPathComponent();
+                    if (node == null) return;
+
+                    // Only leaf nodes (tables, views, etc.)
+                    if (node.isLeaf()) {
+                        String tableName = node.getUserObject().toString();
+                        // Skip system tree nodes like "Tables", "Views", etc.
+                        if (!tableName.equals("Tables") && !tableName.equals("Views") &&
+                            !tableName.equals("Procedures") && !tableName.equals("Functions") &&
+                            !tableName.equals("Triggers") && !tableName.equals("Indexes") &&
+                            !tableName.equals("Sequences") && !tableName.equals("Users")) {
+
+                            txtsql.setText("SELECT * FROM " + tableName);
+                            executeSQL();
+                        }
+                    }
+                }
+            }
+        });
+        ButtonExecute.addActionListener(e -> executeSQL());
+        System.out.println("Active connections: " + connectionManager.getProfileNames());
+        setLocationRelativeTo(null); 
+        
     }
+    
+   
     private void loadTree() {
-    DefaultMutableTreeNode root =
-        new DefaultMutableTreeNode("Conexión");
+     try {
+        Connection conn = connectionManager.getActiveConnection();
+        MetadataService metadata = new MetadataService(conn);
 
-    root.add(new DefaultMutableTreeNode("Tables"));
-    root.add(new DefaultMutableTreeNode("Views"));
-    root.add(new DefaultMutableTreeNode("Procedures"));
-    root.add(new DefaultMutableTreeNode("Triggers"));
-    root.add(new DefaultMutableTreeNode("Indexes"));
-    root.add(new DefaultMutableTreeNode("Sequences"));
-    root.add(new DefaultMutableTreeNode("Users"));
+        DefaultMutableTreeNode root =
+                new DefaultMutableTreeNode(
+                        connectionManager.getActiveProfile().getName()
+                );
 
-    treeDatabase.setModel(new DefaultTreeModel(root));
+        DefaultMutableTreeNode tablesNode = new DefaultMutableTreeNode("Tables");
+        DefaultMutableTreeNode viewsNode = new DefaultMutableTreeNode("Views");
+        DefaultMutableTreeNode proceduresNode = new DefaultMutableTreeNode("Procedures");
+        DefaultMutableTreeNode functionsNode = new DefaultMutableTreeNode("Functions");
+        DefaultMutableTreeNode triggersNode = new DefaultMutableTreeNode("Triggers");
+        DefaultMutableTreeNode indexesNode = new DefaultMutableTreeNode("Indexes");
+        DefaultMutableTreeNode generatorsNode = new DefaultMutableTreeNode("Sequences");
+        DefaultMutableTreeNode usersNode = new DefaultMutableTreeNode("Users");
+
+        for (String name : metadata.getTables())
+            tablesNode.add(new DefaultMutableTreeNode(name));
+
+        for (String name : metadata.getViews())
+            viewsNode.add(new DefaultMutableTreeNode(name));
+
+        for (String name : metadata.getProcedures())
+            proceduresNode.add(new DefaultMutableTreeNode(name));
+
+        for (String name : metadata.getFunctions())
+            functionsNode.add(new DefaultMutableTreeNode(name));
+
+        for (String name : metadata.getTriggers())
+            triggersNode.add(new DefaultMutableTreeNode(name));
+
+        for (String name : metadata.getIndexes())
+            indexesNode.add(new DefaultMutableTreeNode(name));
+
+        for (String name : metadata.getGenerators())
+            generatorsNode.add(new DefaultMutableTreeNode(name));
+
+        for (String name : metadata.getUsers())
+            usersNode.add(new DefaultMutableTreeNode(name));
+
+        root.add(tablesNode);
+        root.add(viewsNode);
+        root.add(proceduresNode);
+        root.add(functionsNode);
+        root.add(triggersNode);
+        root.add(indexesNode);
+        root.add(generatorsNode);
+        root.add(usersNode);
+
+        treeDatabase.setModel(new DefaultTreeModel(root));
+
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(this,
+                "Error loading metadata: " + e.getMessage());
+    }
 }
     
 
@@ -40,7 +128,53 @@ public class MainFrame extends javax.swing.JFrame {
     public void showGui() {
         setVisible(true);
     }
+    
+    private void executeSQL() {
+    try {
+        Connection conn = connectionManager.getActiveConnection();
+        String sql = txtsql.getText().trim();
 
+        if (sql.isEmpty()) return;
+
+        try (Statement stmt = conn.createStatement()) {
+            if (sql.toLowerCase().startsWith("select")) {
+                ResultSet rs = stmt.executeQuery(sql);
+                TblResults.setModel(buildTableModel(rs));
+            } else {
+                int affected = stmt.executeUpdate(sql);
+                JOptionPane.showMessageDialog(this,
+                        "Statement executed successfully. Rows affected: " + affected);
+            }
+        }
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this,
+                    "Error executing SQL: " + e.getMessage());
+        }
+    }
+    
+    private javax.swing.table.TableModel buildTableModel(ResultSet rs) throws SQLException {
+        ResultSetMetaData metaData = rs.getMetaData();
+        int columnCount = metaData.getColumnCount();
+
+        //Nombre de las columnas
+        Vector<String> columnNames = new Vector<>();
+        for (int i = 1; i <= columnCount; i++) {
+            columnNames.add(metaData.getColumnName(i).trim());
+        }
+
+        // Lo mismo pero con filas
+        Vector<Vector<Object>> data = new Vector<>();
+        while (rs.next()) {
+            Vector<Object> row = new Vector<>();
+            for (int i = 1; i <= columnCount; i++) {
+                row.add(rs.getObject(i));
+            }
+            data.add(row);
+        }
+
+        return new javax.swing.table.DefaultTableModel(data, columnNames);
+    }
     
     /**
      * Creates new form MainFrame
@@ -168,6 +302,7 @@ public class MainFrame extends javax.swing.JFrame {
         ButtonPanel.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
 
         ButtonExecute.setText("Execute");
+        ButtonExecute.addActionListener(this::ButtonExecuteActionPerformed);
         ButtonPanel.add(ButtonExecute);
 
         javax.swing.GroupLayout jPanel6Layout = new javax.swing.GroupLayout(jPanel6);
@@ -203,6 +338,7 @@ public class MainFrame extends javax.swing.JFrame {
         MenuFile.setText("File");
 
         MenuExit.setText("Exit");
+        MenuExit.addActionListener(this::MenuExitActionPerformed);
         MenuFile.add(MenuExit);
 
         MenuBar.add(MenuFile);
@@ -271,15 +407,30 @@ public class MainFrame extends javax.swing.JFrame {
 
     private void MenuNewConnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_MenuNewConnActionPerformed
         // TODO add your handling code here:
+        newConnectionFrame newconn = new newConnectionFrame();
+        newconn.setVisible(true);
+        this.dispose();
     }//GEN-LAST:event_MenuNewConnActionPerformed
 
     private void MenuCloseConnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_MenuCloseConnActionPerformed
         // TODO add your handling code here:
+        System.exit(0);
     }//GEN-LAST:event_MenuCloseConnActionPerformed
 
     private void MenuCreateViewActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_MenuCreateViewActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_MenuCreateViewActionPerformed
+
+    private void ButtonExecuteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ButtonExecuteActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_ButtonExecuteActionPerformed
+
+    private void MenuExitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_MenuExitActionPerformed
+        // TODO add your handling code here:
+        LoginFrame login = new LoginFrame();
+        login.setVisible(true);
+        this.dispose();
+    }//GEN-LAST:event_MenuExitActionPerformed
 
     /**
      * @param args the command line arguments

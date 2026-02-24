@@ -1,0 +1,9 @@
+db\FirebirdConnector.class
+UI\MainFrame$1.class
+db\MetadataService.class
+AdminFirebird.class
+db\ConnectionProfile.class
+UI\LoginFrame.class
+UI\MainFrame.class
+UI\newConnectionFrame.class
+db\ConnectionManager.class
