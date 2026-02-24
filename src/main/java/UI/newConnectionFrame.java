@@ -162,20 +162,20 @@ public class newConnectionFrame extends javax.swing.JFrame {
     String sysdbaUrl = "jdbc:firebirdsql://" + host + ":" + port + "/" + baseDBPath;
 
     try (Connection adminConn = DriverManager.getConnection(sysdbaUrl, sysdbaUser, sysdbaPass);
-         Statement stmt = adminConn.createStatement()) {
+     Statement stmt = adminConn.createStatement()) {
 
-        // Crea el usuario
-        String createUserSQL = "CREATE USER \"" + newUser + "\" PASSWORD '" + newPassword + "'";
-        stmt.executeUpdate(createUserSQL);
+    // Crea el usuario
+    String createUserSQL = "CREATE USER \"" + newUser + "\" PASSWORD '" + newPassword + "'";
+    stmt.executeUpdate(createUserSQL);
 
-        // Da acceso a las tablas
-        stmt.executeUpdate("GRANT SELECT, INSERT, UPDATE, DELETE ON USERS TO \"" + newUser + "\"");
+    // Da acceso a las tablas
+    stmt.executeUpdate("GRANT SELECT, INSERT, UPDATE, DELETE ON USERS TO \"" + newUser + "\"");
 
-        // Le dara el rol admin automaticamente
-        String grantAdminSQL = "ALTER USER \"" + newUser + "\" GRANT ADMIN ROLE";
-        stmt.executeUpdate(grantAdminSQL);
+    // Le dara el rol admin automaticamente
+    String grantAdminSQL = "ALTER USER \"" + newUser + "\" GRANT ADMIN ROLE";
+    stmt.executeUpdate(grantAdminSQL);
 
-        JOptionPane.showMessageDialog(this, "User created and granted ADMIN role successfully!");
+    JOptionPane.showMessageDialog(this, "User created and granted ADMIN role successfully!");
 
     } catch (SQLException e) {
         JOptionPane.showMessageDialog(this, "Failed to create user: " + e.getMessage());

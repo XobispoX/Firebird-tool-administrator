@@ -40,10 +40,10 @@ public class MainFrame extends javax.swing.JFrame {
                     DefaultMutableTreeNode node = (DefaultMutableTreeNode) treeDatabase.getLastSelectedPathComponent();
                     if (node == null) return;
 
-                    // Only leaf nodes (tables, views, etc.)
+                    // Nodes Hojas 
                     if (node.isLeaf()) {
                         String tableName = node.getUserObject().toString();
-                        // Skip system tree nodes like "Tables", "Views", etc.
+                        // El sistema del arbol y sus nodos
                         if (!tableName.equals("Tables") && !tableName.equals("Views") &&
                             !tableName.equals("Procedures") && !tableName.equals("Functions") &&
                             !tableName.equals("Triggers") && !tableName.equals("Indexes") &&
@@ -403,12 +403,13 @@ public class MainFrame extends javax.swing.JFrame {
 
     private void MenuRefreshActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_MenuRefreshActionPerformed
         // TODO add your handling code here:
+        loadTree();
     }//GEN-LAST:event_MenuRefreshActionPerformed
 
     private void MenuNewConnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_MenuNewConnActionPerformed
         // TODO add your handling code here:
-        newConnectionFrame newconn = new newConnectionFrame();
-        newconn.setVisible(true);
+        LoginFrame login = new LoginFrame();
+        login.setVisible(true);
         this.dispose();
     }//GEN-LAST:event_MenuNewConnActionPerformed
 
